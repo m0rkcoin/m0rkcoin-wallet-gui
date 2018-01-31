@@ -1,0 +1,15 @@
+{
+  "name": "m0rkcoin-wallet-gui",
+  "version": "1.0.0",
+  "description": "M0rkcoin Wallet",
+  "main": "main.js",
+  "dependencies": {
+    "electron": "^1.7.10"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "electron ."
+  },
+  "author": "MarcDufresne",
+  "license": "ISC"
+}

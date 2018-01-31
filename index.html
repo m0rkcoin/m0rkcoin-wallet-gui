@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>M0rkcoin Wallet</title>
+    <link href="assets/css/global.css" rel="stylesheet">
+    <link href="assets/css/photon.min.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="window">
+    <div class="window-content">
+        <div class="pane-group">
+            <div class="pane-one-third sidebar">
+                <div class="padded-more">
+                    <h1>M0rkcoin</h1>
+                    <p>
+                        <span class="small-label">Wallet address</span><br>
+                        <span id="walletAddress" style="word-break: break-all">N/A</span>
+                    </p>
+                    <p>
+                        <span class="small-label">Available Balance</span><br>
+                        <span id="walletBalanceAvail">N/A</span><br>
+                        <span class="small-label">Locked</span><br>
+                        <span id="walletBalanceLocked">N/A</span>
+                    </p>
+                </div>
+            </div>
+            <div class="pane">
+                <div class="tab-group">
+                    <div class="tab-item">
+                        Send
+                    </div>
+                    <div class="tab-item">
+                        Transactions
+                    </div>
+                    <div class="tab-item active">
+                        Logs
+                    </div>
+                </div>
+                <div class="tab-content">
+                    <div class="tab-pane" id="tabSend">
+
+                    </div>
+                    <div class="tab-pane" id="tabTransactions">
+
+                    </div>
+                    <div class="tab-pane" id="tabLogs">
+                        <div class="padded-more">
+                            <form id="walletCommandForm">
+                                <div class="form-group">
+                                    <label for="walletCommand">Command: </label>
+                                    <input type="text" id="walletCommand" value=""/>
+                                </div>
+                                <div class="form-actions">
+                                    <button class="btn btn-large btn-default" type="submit" id="walletSendCommandBtn" disabled>Run</button>
+                                </div>
+                            </form>
+
+                            <hr>
+
+                            <div>
+                                <p>Daemon Logs:</p>
+                                <textarea style="width: 100%; height: 120px" readonly id="daemonConsole"></textarea>
+                            </div>
+
+                            <hr>
+
+                            <div>
+                                <p>Wallet Logs:</p>
+                                <textarea style="width: 100%; height: 120px" readonly id="walletConsole"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Init
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    const daemonConsole = document.querySelector('#daemonConsole');
+    const walletConsole = document.querySelector('#walletConsole');
+
+    let walletReady = false;
+
+    // Events Out
+    const walletForm = document.querySelector('#walletCommandForm');
+    walletForm.addEventListener('submit', (event) => {
+        if (!walletReady) {
+            console.log('wallet not ready');
+            return;
+        }
+        event.preventDefault();
+        console.log('sending wallet command');
+        ipcRenderer.send('wallet:sendCommand', {
+            command: document.querySelector('#walletCommand').value,
+        });
+    });
+
+    // Events In
+    ipcRenderer.on('daemonUpdate', (event, data) => {
+        console.log('got daemon update: ' + data.message);
+        daemonConsole.value += data.message;
+        daemonConsole.scrollTop = daemonConsole.scrollHeight;
+    });
+
+    ipcRenderer.on('walletUpdate', (event, data) => {
+        console.log('got wallet update: ' + data.message);
+        walletConsole.value += data.message;
+        walletConsole.scrollTop = walletConsole.scrollHeight;
+    });
+
+    ipcRenderer.on('walletReady', (event, data) => {
+        walletReady = data.walletReady;
+        document.querySelector('#walletSendCommandBtn').disabled = !walletReady
+    });
+
+    ipcRenderer.on('walletAddress', (event, data) => {
+        document.querySelector('#walletAddress').textContent = data.address;
+    });
+
+    ipcRenderer.on('walletBalance', (event, data) => {
+        document.querySelector('#walletBalanceAvail').textContent = data.available;
+        document.querySelector('#walletBalanceLocked').textContent = data.locked;
+    });
+
+</script>
+</body>
+</html>

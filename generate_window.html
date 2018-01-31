@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Generate a wallet</title>
+    <link href="assets/css/global.css" rel="stylesheet">
+    <link href="assets/css/photon.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="window">
+    <div class="window-content">
+        <div class="padded-bottom-more padded-horizontally-more padded-top-less">
+            <h1>Generate a Wallet</h1>
+            <form id="passwordPrompt">
+                <div class="form-group">
+                    <label for="walletPass">Password:</label>
+                    <input class="form-control" type="password" id="walletPass"/>
+                </div>
+                <div class="form-group">
+                    <label for="walletPassConfirm">Confirm Password:</label>
+                    <input class="form-control" type="password" id="walletPassConfirm"/>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-large btn-positive">Generate</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Init
+    const electron = require('electron');
+    const {ipcRenderer} = electron;
+
+    const walletPass = document.querySelector('#walletPass');
+    const walletPassConfirm = document.querySelector('#walletPassConfirm');
+
+    // Events Out
+    const walletForm = document.querySelector('#generateForm');
+    walletForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+
+        if (walletPass.value !== walletPassConfirm.value) {
+            alert('Password don\'t match');
+            return;
+        }
+
+        console.log('generating wallet');
+        ipcRenderer.send('wallet:generate', {
+            password: document.querySelector('#walletPass').value,
+        });
+    });
+</script>
+</body>
+</html>
