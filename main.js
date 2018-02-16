@@ -255,6 +255,20 @@ ipcMain.on('wallet:unlock', (event, item) => {
     rpcGetBalance();
 });
 
+ipcMain.on('wallet:refreshBalance', () => {
+    rpcGetBalance();
+});
+
+ipcMain.on('wallet:transfer', (event, item) => {
+    rpcTransfer(
+        item.destinationAddress,
+        item.amount,
+        item.paymentId,
+        item.mixin,
+        item.transactionFee
+    );
+});
+
 // Daemon
 let daemon;
 let wallet;
@@ -327,25 +341,52 @@ function sendRpcCommand(command, params, callback) {
 
 function rpcGetAddress() {
     sendRpcCommand('get_address', {}, (error, response, body) => {
-        if (response.statusCode === 200) {
+        if (body.result) {
             walletAddress = body.result.address;
             sendWalletAddressToFrontend();
         } else {
-            console.log(`Error: ${response.statusCode}, ${body}`)
+            console.log(`Error: ${body.error.message}`)
         }
     });
 }
 
 function rpcGetBalance() {
     sendRpcCommand('getbalance', {}, (error, response, body) => {
-        if (response.statusCode === 200) {
+        if (body.result) {
             let availableBalance = body.result.available_balance;
             let lockedBalance = body.result.locked_amount;
             sendWalletBalanceToFrontend(availableBalance, lockedBalance);
         } else {
-            console.log(`Error: ${response.statusCode}, ${body}`)
+            console.log(`Error: ${body.error.message}`)
         }
     });
+}
+
+function rpcTransfer(destinationAddress, amount, paymentId, mixin, transactionFee) {
+    sendRpcCommand(
+        'transfer',
+        {
+            destinations: [{
+                amount: amount,
+                address: destinationAddress
+            }],
+            payment_id: paymentId,
+            fee: transactionFee,
+            mixin: mixin,
+            unlock_time: 0
+        },
+        (error, response, body) => {
+            if (body.error) {
+                mainWindow.webContents.send('walletSendError', {
+                    message: body.error.message
+                });
+            } else {
+                mainWindow.webContents.send('walletSendSuccess', {
+                    message: "Sent!"
+                });
+            }
+        }
+    )
 }
 
 function startWallet(file, password) {

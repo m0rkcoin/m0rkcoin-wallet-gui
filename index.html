@@ -22,6 +22,8 @@
             <span id="walletBalanceAvail">N/A</span><br>
             <span class="small-label"><span class="icon icon-lock"></span> Locked</span><br>
             <span id="walletBalanceLocked">N/A</span>
+            <br>
+            <span id="refreshBalance" class="text-btn text-btn-small">Refresh</span>
         </p>
     </div>
 
@@ -29,7 +31,36 @@
     <label for='tab-1' class="label-tab">Send</label>
 
     <article class='tab-1' id="tab-send">
-
+        <form id="sendForm">
+            <div class="form-group">
+                <label for="destinationAddress">Recipient Address <span class="red">*</span></label>
+                <input type="text" class="form-control" id="destinationAddress" required placeholder="fmrk....">
+            </div>
+            <div class="form-group">
+                <label for="transactionAmount">Amount <span class="red">*</span></label>
+                <input type="number" class="form-control" id="transactionAmount" required value="0">
+            </div>
+            <div class="form-group">
+                <label for="paymentId">Payment ID</label>
+                <input type="text" class="form-control" id="paymentId" maxlength="64">
+            </div>
+            <div class="form-group">
+                <label for="mixin">Anonymity/Mixin <span class="red">*</span></label>
+                <input type="number" class="form-control" id="mixin" required value="0">
+            </div>
+            <div class="form-group">
+                <label for="transactionFee">Fee <span class="red">*</span></label>
+                <input type="number" class="form-control" id="transactionFee" required value="0.000001" placeholder="0.000001">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-large btn-positive">Send</button>
+                <button type="reset" class="btn btn-large btn-negative">Reset</button>
+            </div>
+            <div>
+                <span id="sendError"></span>
+                <span id="sendMessage"></span>
+            </div>
+        </form>
     </article>
 
     <input class='hide' type="radio" id="tab-2" name="tractor"/>
@@ -56,9 +87,9 @@
     const {ipcRenderer, clipboard} = electron;
 
     const daemonConsole = document.querySelector('#daemonConsole');
-    const walletConsole = document.querySelector('#walletConsole');
 
-    let walletReady = false;
+    const sendMessage = document.querySelector("#sendMessage");
+    const sendError = document.querySelector("#sendError");
 
     // UI Interactions
     const copyWalletAddressBtn = document.querySelector("#copyWalletAddress");
@@ -66,25 +97,33 @@
         clipboard.writeText(document.querySelector('#walletAddress').textContent)
     });
 
-    // Events Out
+    const refreshBalanceBtn = document.querySelector("#refreshBalance");
+    refreshBalanceBtn.addEventListener('click', () => {
+        ipcRenderer.send('wallet:refreshBalance');
+    });
 
+    // Events Out
+    const sendForm = document.querySelector('#sendForm');
+    sendForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        ipcRenderer.send('wallet:transfer', {
+            destinationAddress: document.querySelector("#destinationAddress").value,
+            amount: Number.parseFloat(document.querySelector("#transactionAmount").value) * 1000000000000,
+            paymentId: document.querySelector("#paymentId").value,
+            mixin: Number.parseFloat(document.querySelector("#mixin").value),
+            transactionFee: Number.parseFloat(document.querySelector("#transactionFee").value) * 1000000000000,
+        });
+    });
+
+    sendForm.addEventListener('reset', () => {
+        sendForm.reset();
+    });
 
     // Events In
     ipcRenderer.on('daemonUpdate', (event, data) => {
         console.log('got daemon update: ' + data.message);
         daemonConsole.value += data.message;
         daemonConsole.scrollTop = daemonConsole.scrollHeight;
-    });
-
-    ipcRenderer.on('walletUpdate', (event, data) => {
-        console.log('got wallet update: ' + data.message);
-        walletConsole.value += data.message;
-        walletConsole.scrollTop = walletConsole.scrollHeight;
-    });
-
-    ipcRenderer.on('walletReady', (event, data) => {
-        walletReady = data.walletReady;
-        document.querySelector('#walletSendCommandBtn').disabled = !walletReady
     });
 
     ipcRenderer.on('walletAddress', (event, data) => {
@@ -96,6 +135,17 @@
         let locked = Number.parseFloat(data.locked / 1000000000000).toFixed(12);
         document.querySelector('#walletBalanceAvail').textContent = available;
         document.querySelector('#walletBalanceLocked').textContent = locked;
+    });
+
+    ipcRenderer.on('walletSendSuccess', (event, data) => {
+        sendMessage.textContent = data.message;
+        sendError.textContent = "";
+        sendForm.reset();
+    });
+
+    ipcRenderer.on('walletSendError', (event, data) => {
+        sendMessage.textContent = "";
+        sendError.textContent = data.message;
     });
 
 </script>

@@ -107,3 +107,15 @@ input:checked + .label-tab {
 .hide {
     display: none;
 }
+
+.red {
+    color: #fb2f29;
+}
+
+#sendError {
+    color: #fb2f29;
+}
+
+#sendMessage {
+    color: #29a03b;
+}
