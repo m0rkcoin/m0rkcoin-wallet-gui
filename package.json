@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "M0rkcoin Wallet",
   "main": "main.js",
+  "repository": "https://github.com/m0rkcoin/m0rkcoin-wallet-gui",
   "dependencies": {
-    "electron": "^1.7.10"
+    "electron": "^1.7.10",
+    "request": "^2.83.0"
   },
   "devDependencies": {},
   "scripts": {

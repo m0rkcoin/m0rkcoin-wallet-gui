@@ -2,6 +2,7 @@ const electron = require('electron');
 const url = require('url');
 const path = require('path');
 const exec = require('child_process');
+const request = require('request');
 
 const {app, BrowserWindow, Menu, ipcMain, dialog} = electron;
 
@@ -12,6 +13,23 @@ let unlockWindow;
 
 let currentWalletPath;
 let currentSaveWalletPath;
+
+let _simpleWalletPath;
+let _daemonPath;
+
+if (process.platform === 'win32') {
+    _simpleWalletPath = path.join(__dirname, "bin", process.platform, "simplewallet.exe");
+    _daemonPath = path.join(__dirname, "bin", process.platform, "m0rkcoind.exe");
+} else {
+    _simpleWalletPath = path.join(__dirname, "bin", process.platform, "simplewallet");
+    _daemonPath = path.join(__dirname, "bin", process.platform, "m0rkcoind");
+}
+
+const simpleWalletPath = _simpleWalletPath;
+const daemonPath = _daemonPath;
+
+const walletRpcPort = "18598";
+const walletRpcAddress = `http://127.0.0.1:${walletRpcPort}/json_rpc`;
 
 
 const mainMenuTemplate = [
@@ -201,7 +219,7 @@ ipcMain.on('wallet:generate', (event, item) => {
     generateWindow.close();
     console.log('generating wallet with password: ' + item.password);
     let genWallet = exec.spawn(
-        path.join(__dirname, 'bin', 'win32', 'simplewallet.exe'),
+        simpleWalletPath,
         ['--generate-new-wallet', currentSaveWalletPath, '--password', item.password]);
 
     genWallet.stdout.on('data', (data) => {
@@ -224,30 +242,23 @@ ipcMain.on('wallet:generate', (event, item) => {
         console.log('generate wallet stderr: ' + data);
     });
 
-    genWallet.on('close', (code) => {
+    genWallet.on('close', () => {
         console.log('finished generating wallet');
     });
-});
-
-ipcMain.on('wallet:sendCommand', (event, data) => {
-    sendWalletCommand(data.command);
 });
 
 ipcMain.on('wallet:unlock', (event, item) => {
     unlockWindow.close();
     stopWallet();
     startWallet(currentWalletPath, item.password);
-    walletCmdQueue.push('address');
-    walletCmdQueue.push('balance');
+    rpcGetAddress();
+    rpcGetBalance();
 });
 
 // Daemon
 let daemon;
 let wallet;
-let walletReady = false;
-let walletCommand = null;
 let walletAddress = null;
-let walletCmdQueue = [];
 
 function startDaemon() {
     if (daemon) {
@@ -255,7 +266,7 @@ function startDaemon() {
         return;
     }
 
-    daemon = exec.spawn('./bin/win32/m0rkcoind.exe');
+    daemon = exec.spawn(daemonPath);
 
     daemon.stdout.on('data', (data) => {
         logDaemonMessage(data);
@@ -265,7 +276,7 @@ function startDaemon() {
         logDaemonMessage(data);
     });
         
-    daemon.on('close', (code, status) => {
+    daemon.on('close', (code) => {
         logDaemonMessage(`Daemon exited with code: ${code}\n`);
     });
 }
@@ -287,13 +298,6 @@ function logDaemonMessage(message) {
     }
 }
 
-function logWalletMessage(message) {
-    console.log('wallet: ' + message);
-    if (mainWindow) {
-        mainWindow.webContents.send('walletUpdate', {'message': message});
-    }
-}
-
 function sendWalletAddressToFrontend() {
     if (mainWindow) {
         mainWindow.webContents.send('walletAddress', {address: walletAddress});
@@ -310,42 +314,38 @@ function sendWalletBalanceToFrontend(available, locked) {
 }
 
 // Wallet
-function isWalletReady(sData) {
-    return RegExp("\\[wallet fmrk[\\d\\w]{2}\\]:").exec(sData) !== null
+function sendRpcCommand(command, params, callback) {
+    request.post({
+        url: walletRpcAddress,
+        json: {
+            jsonrpc: "",
+            method: command,
+            params: params
+        }
+    }, callback);
 }
 
-function setWalletReady(isReady) {
-    walletReady = isReady;
-    mainWindow.webContents.send('walletReady', {walletReady: isReady});
+function rpcGetAddress() {
+    sendRpcCommand('get_address', {}, (error, response, body) => {
+        if (response.statusCode === 200) {
+            walletAddress = body.result.address;
+            sendWalletAddressToFrontend();
+        } else {
+            console.log(`Error: ${response.statusCode}, ${body}`)
+        }
+    });
 }
 
-function parseWalletOutput(sData) {
-    if (!walletAddress){
-        const walletAddressRegEx = RegExp("Opened wallet: (fmrk[\\w\\d]{95})");
-        const match = sData.match(walletAddressRegEx);
-        if (match) {
-            walletAddress = match[1];
-            sendWalletAddressToFrontend();
+function rpcGetBalance() {
+    sendRpcCommand('getbalance', {}, (error, response, body) => {
+        if (response.statusCode === 200) {
+            let availableBalance = body.result.available_balance;
+            let lockedBalance = body.result.locked_amount;
+            sendWalletBalanceToFrontend(availableBalance, lockedBalance);
+        } else {
+            console.log(`Error: ${response.statusCode}, ${body}`)
         }
-    }
-
-    if (walletCommand === "address") {
-        const walletAddressRegEx = RegExp("INFO    (fmrk[\\w\\d]{95})");
-        const match = sData.match(walletAddressRegEx);
-        if (match) {
-            walletAddress = match[1];
-            console.log('Address is: ' + walletAddress);
-            sendWalletAddressToFrontend();
-        }
-    } else if (walletCommand === "balance") {
-        const balanceRegEx = RegExp("available balance: (\\d+\\.\\d{12}), locked amount: (\\d+\\.\\d{12})");
-        const match = sData.match(balanceRegEx);
-        if (match) {
-            sendWalletBalanceToFrontend(match[1], match[2]);
-        }
-    } else if (walletCommand === "exit") {
-        console.log("EXIT");
-    }
+    });
 }
 
 function startWallet(file, password) {
@@ -355,34 +355,10 @@ function startWallet(file, password) {
     }
 
     wallet = exec.spawn(
-       path.join(__dirname, 'bin', process.platform, 'simplewallet.exe'),
-       ['--wallet-file', file, '--password', password]);
-    
-    wallet.stdout.on('data', (data) => {
-        setWalletReady(false);
-        let sData = data.toString();
+       simpleWalletPath,
+       ['--wallet-file', file, '--password', password, '--rpc-bind-port', walletRpcPort]);
 
-        logWalletMessage(sData);
-        parseWalletOutput(sData);
-
-        if (isWalletReady(sData)) {
-            console.log("WALLET READY");
-            walletCommand = null;
-
-            if (walletCmdQueue.length > 0) {
-                sendWalletCommand(walletCmdQueue[0]);
-                walletCmdQueue.shift();
-            } else {
-                setWalletReady(true);
-            }
-        }
-    });
-
-    wallet.stderr.on('data', (data) => {
-        console.log('stderr: ' + data.toString());
-    });
-
-    wallet.on('close', (code, signal) => {
+    wallet.on('close', (code) => {
         console.log(`wallet exited with code ${code}`);
     });
 }
@@ -395,15 +371,4 @@ function stopWallet() {
 
     wallet.kill('SIGINT');
     wallet = null;
-}
-
-function sendWalletCommand(command) {
-    if (!wallet) {
-        console.log('wallet is not running');
-        return;
-    }
-    walletCommand = command;
-    setWalletReady(false);
-    console.log('sending command: ' + command);
-    wallet.stdin.write(command + '\n');
 }

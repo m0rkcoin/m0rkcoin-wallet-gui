@@ -13,3 +13,97 @@ input, button, textarea, :focus {
     font-weight: bold;
     font-size: smaller;
 }
+
+.text-btn {
+    color: #29a03b;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.text-btn-small {
+    font-size: smaller;
+}
+
+.main-container {
+    display: grid;
+    grid-template-columns: 25% repeat(3, 1fr);
+    grid-template-rows: 30px auto;
+    grid-template-areas:
+        "sidebar t-1 t-2 t-3"
+        "sidebar ver ver ver";
+    min-height: 100%;
+    grid-auto-rows: 0;
+}
+
+.app-sidebar {
+    grid-area: sidebar;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    background: #c2c0c2;
+    padding: 10px;
+}
+
+/* & the labels go to... */
+[for*='-1'] {
+    grid-area: t-1;
+}
+
+[for*='-2'] {
+    grid-area: t-2;
+}
+
+[for*='-3'] {
+    grid-area: t-3;
+}
+
+:checked + label + article {
+    grid-area: ver;
+    z-index: 1;
+}
+
+.container-tabs {
+    overflow: hidden;
+}
+
+[class*='tab-'] {
+    opacity: 0;
+    max-width: 0;
+    max-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+:checked + label + [class*='tab-'] {
+    background: #f1f1f1;
+    opacity: 1;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 10px;
+}
+
+.label-tab {
+    cursor: pointer;
+    text-align: center;
+    line-height: 2.25;
+    z-index: 1;
+    margin-bottom: 0;
+}
+
+.label-tab:hover {
+    background: rgba(0,0,0,.1);
+}
+
+input:not(checked) + .label-tab {
+    background: rgba(0,0,0,.2);
+}
+
+input:checked + .label-tab {
+    background: #f1f1f1;
+}
+
+.hide {
+    display: none;
+}

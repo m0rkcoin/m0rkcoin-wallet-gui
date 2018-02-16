@@ -8,99 +8,66 @@
 </head>
 <body>
 
-<div class="window">
-    <div class="window-content">
-        <div class="pane-group">
-            <div class="pane-one-third sidebar">
-                <div class="padded-more">
-                    <h1>M0rkcoin</h1>
-                    <p>
-                        <span class="small-label">Wallet address</span><br>
-                        <span id="walletAddress" style="word-break: break-all">N/A</span>
-                    </p>
-                    <p>
-                        <span class="small-label">Available Balance</span><br>
-                        <span id="walletBalanceAvail">N/A</span><br>
-                        <span class="small-label">Locked</span><br>
-                        <span id="walletBalanceLocked">N/A</span>
-                    </p>
-                </div>
-            </div>
-            <div class="pane">
-                <div class="tab-group">
-                    <div class="tab-item">
-                        Send
-                    </div>
-                    <div class="tab-item">
-                        Transactions
-                    </div>
-                    <div class="tab-item active">
-                        Logs
-                    </div>
-                </div>
-                <div class="tab-content">
-                    <div class="tab-pane" id="tabSend">
+<div class="main-container">
 
-                    </div>
-                    <div class="tab-pane" id="tabTransactions">
-
-                    </div>
-                    <div class="tab-pane" id="tabLogs">
-                        <div class="padded-more">
-                            <form id="walletCommandForm">
-                                <div class="form-group">
-                                    <label for="walletCommand">Command: </label>
-                                    <input type="text" id="walletCommand" value=""/>
-                                </div>
-                                <div class="form-actions">
-                                    <button class="btn btn-large btn-default" type="submit" id="walletSendCommandBtn" disabled>Run</button>
-                                </div>
-                            </form>
-
-                            <hr>
-
-                            <div>
-                                <p>Daemon Logs:</p>
-                                <textarea style="width: 100%; height: 120px" readonly id="daemonConsole"></textarea>
-                            </div>
-
-                            <hr>
-
-                            <div>
-                                <p>Wallet Logs:</p>
-                                <textarea style="width: 100%; height: 120px" readonly id="walletConsole"></textarea>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="app-sidebar">
+        <h1>M0rkcoin</h1>
+        <p>
+            <span class="small-label"><span class="icon icon-network"></span> Wallet address</span><br>
+            <span id="walletAddress" style="word-break: break-all">N/A</span>
+            <span id="copyWalletAddress" class="text-btn text-btn-small">COPY</span>
+        </p>
+        <p>
+            <span class="small-label"><span class="icon icon-credit-card"></span> Available Balance</span><br>
+            <span id="walletBalanceAvail">N/A</span><br>
+            <span class="small-label"><span class="icon icon-lock"></span> Locked</span><br>
+            <span id="walletBalanceLocked">N/A</span>
+        </p>
     </div>
+
+    <input class='hide' type="radio" id="tab-1" name="tractor"/>
+    <label for='tab-1' class="label-tab">Send</label>
+
+    <article class='tab-1' id="tab-send">
+
+    </article>
+
+    <input class='hide' type="radio" id="tab-2" name="tractor"/>
+    <label for='tab-2' class="label-tab">Transactions</label>
+
+    <article class='tab-2' id="tab-transactions">
+
+    </article>
+
+    <input class='hide' type="radio" id="tab-3" name="tractor" checked='checked'/>
+    <label for='tab-3' class="label-tab">Logs</label>
+
+    <article class='tab-3' id="tab-logs">
+        <div>
+            <label for="daemonConsole">Daemon Logs:</label>
+            <textarea style="width: 100%; height: 240px" readonly id="daemonConsole"></textarea>
+        </div>
+    </article>
 </div>
 
 <script>
     // Init
     const electron = require('electron');
-    const {ipcRenderer} = electron;
+    const {ipcRenderer, clipboard} = electron;
 
     const daemonConsole = document.querySelector('#daemonConsole');
     const walletConsole = document.querySelector('#walletConsole');
 
     let walletReady = false;
 
-    // Events Out
-    const walletForm = document.querySelector('#walletCommandForm');
-    walletForm.addEventListener('submit', (event) => {
-        if (!walletReady) {
-            console.log('wallet not ready');
-            return;
-        }
-        event.preventDefault();
-        console.log('sending wallet command');
-        ipcRenderer.send('wallet:sendCommand', {
-            command: document.querySelector('#walletCommand').value,
-        });
+    // UI Interactions
+    const copyWalletAddressBtn = document.querySelector("#copyWalletAddress");
+    copyWalletAddressBtn.addEventListener('click', () => {
+        clipboard.writeText(document.querySelector('#walletAddress').textContent)
     });
+
+    // Events Out
+
 
     // Events In
     ipcRenderer.on('daemonUpdate', (event, data) => {
@@ -125,8 +92,10 @@
     });
 
     ipcRenderer.on('walletBalance', (event, data) => {
-        document.querySelector('#walletBalanceAvail').textContent = data.available;
-        document.querySelector('#walletBalanceLocked').textContent = data.locked;
+        let available = Number.parseFloat(data.available / 1000000000000).toFixed(12);
+        let locked = Number.parseFloat(data.locked / 1000000000000).toFixed(12);
+        document.querySelector('#walletBalanceAvail').textContent = available;
+        document.querySelector('#walletBalanceLocked').textContent = locked;
     });
 
 </script>
