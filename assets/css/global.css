@@ -119,3 +119,24 @@ input:checked + .label-tab {
 #sendMessage {
     color: #29a03b;
 }
+
+.btn:disabled {
+    background: #737475;
+    border-color: #333333;
+}
+
+.transactions-top {
+    display: grid;
+    grid-template-rows: 1fr;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 5px;
+}
+
+.transactions-header {
+    grid-column: 1;
+}
+
+.transactions-actions {
+    grid-column: 2;
+    justify-self: end;
+}

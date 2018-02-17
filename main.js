@@ -31,25 +31,11 @@ const daemonPath = _daemonPath;
 const walletRpcPort = "18598";
 const walletRpcAddress = `http://127.0.0.1:${walletRpcPort}/json_rpc`;
 
-
-const mainMenuTemplate = [
+const darwinMenuTemplate = [
+    {},
     {
         label: 'File',
         submenu: [
-            {
-                label: 'Open Wallet',
-                accelerator: process.platform === 'darwin' ? 'Command+O' : 'Ctrl+O',
-                click() {
-                    openWalletSelectDialog();
-                }
-            },
-            {
-                label: 'Generate Wallet',
-                accelerator: process.platform === 'darwin' ? 'Command+G' : 'Ctrl+G',
-                click() {
-                    openGenerateWindow();
-                }
-            },
             {
                 label: 'Quit',
                 accelerator: process.platform === 'darwin' ? 'Command+Q' : 'Ctrl+Q',
@@ -61,28 +47,8 @@ const mainMenuTemplate = [
     }
 ];
 
-if (process.platform === 'darwin') {
-    mainMenuTemplate.unshift({});
-}
-
 if (process.env.NODE_ENV !== 'production') {
     app.commandLine.appendSwitch('remote-debugging-port', '9222');
-    mainMenuTemplate.push({
-        label: 'Dev Tools',
-        submenu: [
-            {
-                label: 'Open Dev Tools',
-                accelerator: process.platform === 'darwin' ? 'Command+I' : 'Ctrl+I',
-                click(item, focusedWindow){
-                    focusedWindow.toggleDevTools();
-                }
-            },
-            {
-                role: 'reload',
-                accelerator: process.platform === 'darwin' ? 'Command+R' : 'Ctrl+R'
-            }
-        ]
-    })
 }
 
 function createWindow() {
@@ -104,9 +70,12 @@ function createWindow() {
         mainWindow = null;
     });
 
-    const mainMenu = Menu.buildFromTemplate(mainMenuTemplate);
-
-    Menu.setApplicationMenu(mainMenu);
+    if (process.platform === 'darwin') {
+        const mainMenu = Menu.buildFromTemplate(darwinMenuTemplate);
+        Menu.setApplicationMenu(mainMenu);
+    } else {
+        Menu.setApplicationMenu(null);
+    }
 
     startDaemon();
 }
@@ -181,6 +150,11 @@ function openWalletSelectDialog() {
         console.log(walletPath);
     }
 
+    if (!walletPath) {
+        console.log('open aborted');
+        return;
+    }
+
     if (walletPath.endsWith('.wallet')) {
         walletPath = walletPath.substring(0, walletPath.length - 7);
     }
@@ -247,16 +221,31 @@ ipcMain.on('wallet:generate', (event, item) => {
     });
 });
 
+ipcMain.on('wallet:actionOpen', () => {
+    openWalletSelectDialog();
+});
+
+ipcMain.on('wallet:actionClose', () => {
+    stopWallet();
+});
+
+ipcMain.on('wallet:actionGenerate', () => {
+    openGenerateWindow();
+});
+
+
 ipcMain.on('wallet:unlock', (event, item) => {
     unlockWindow.close();
     stopWallet();
     startWallet(currentWalletPath, item.password);
     rpcGetAddress();
     rpcGetBalance();
+    rpcStore();
 });
 
 ipcMain.on('wallet:refreshBalance', () => {
     rpcGetBalance();
+    rpcStore();
 });
 
 ipcMain.on('wallet:transfer', (event, item) => {
@@ -267,12 +256,20 @@ ipcMain.on('wallet:transfer', (event, item) => {
         item.mixin,
         item.transactionFee
     );
+    rpcStore();
+    rpcGetBalance();
+});
+
+ipcMain.on('wallet:getTransactions', () => {
+    rpcGetTransfers();
 });
 
 // Daemon
 let daemon;
 let wallet;
 let walletAddress = null;
+
+let walletTransfers = [];
 
 function startDaemon() {
     if (daemon) {
@@ -345,7 +342,7 @@ function rpcGetAddress() {
             walletAddress = body.result.address;
             sendWalletAddressToFrontend();
         } else {
-            console.log(`Error: ${body.error.message}`)
+            console.log(`Error: ${body.error.message}`);
         }
     });
 }
@@ -357,7 +354,7 @@ function rpcGetBalance() {
             let lockedBalance = body.result.locked_amount;
             sendWalletBalanceToFrontend(availableBalance, lockedBalance);
         } else {
-            console.log(`Error: ${body.error.message}`)
+            console.log(`Error: ${body.error.message}`);
         }
     });
 }
@@ -389,6 +386,21 @@ function rpcTransfer(destinationAddress, amount, paymentId, mixin, transactionFe
     )
 }
 
+function rpcStore() {
+    sendRpcCommand('store', {}, () => {});
+}
+
+function rpcGetTransfers() {
+    sendRpcCommand('get_transfers', {}, (error, response, body) => {
+        if (body.error) {
+            console.log(`Error: ${body.error.message}`);
+        } else {
+            walletTransfers = body.result.transfers.reverse();
+            mainWindow.webContents.send('walletGetTransfers', walletTransfers);
+        }
+    });
+}
+
 function startWallet(file, password) {
     if (wallet) {
         console.log('wallet is already running');
@@ -402,6 +414,8 @@ function startWallet(file, password) {
     wallet.on('close', (code) => {
         console.log(`wallet exited with code ${code}`);
     });
+
+    mainWindow.webContents.send('walletOpened');
 }
 
 function stopWallet() {
@@ -412,4 +426,6 @@ function stopWallet() {
 
     wallet.kill('SIGINT');
     wallet = null;
+
+    mainWindow.webContents.send('walletClosed');
 }
