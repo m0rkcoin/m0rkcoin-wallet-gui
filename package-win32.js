@@ -11,6 +11,8 @@ packager({
         RegExp("\.vscode"),
         RegExp("\.gitignore"),
         RegExp("package-win32.js"),
+	RegExp("package-linux.js"),
+	RegExp("package-darwin.js"),
         RegExp("todo")
     ],
     out: 'build',

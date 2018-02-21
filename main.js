@@ -237,10 +237,13 @@ ipcMain.on('wallet:actionGenerate', () => {
 ipcMain.on('wallet:unlock', (event, item) => {
     unlockWindow.close();
     stopWallet();
-    startWallet(currentWalletPath, item.password);
-    rpcGetAddress();
-    rpcGetBalance();
-    rpcStore();
+    startWallet(currentWalletPath, item.password, () => {
+        setTimeout(() => {
+            rpcGetAddress();
+            rpcGetBalance();
+            rpcStore();
+        }, 3000);
+    });
 });
 
 ipcMain.on('wallet:refreshBalance', () => {
@@ -401,7 +404,7 @@ function rpcGetTransfers() {
     });
 }
 
-function startWallet(file, password) {
+function startWallet(file, password, callback) {
     if (wallet) {
         console.log('wallet is already running');
         return;
@@ -416,6 +419,8 @@ function startWallet(file, password) {
     });
 
     mainWindow.webContents.send('walletOpened');
+
+    callback();
 }
 
 function stopWallet() {
